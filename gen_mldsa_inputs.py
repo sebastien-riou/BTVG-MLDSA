@@ -16,7 +16,7 @@ def size_str(size):
     return f'{size}'
 
 # A functions to generate all inputs from the parameters
-def gen_mldas_inputs(params):
+def gen_mldsa_inputs(params):
     if params['ctx_size'] > 0:
         raise RuntimeError('Not implemented')
 
@@ -63,7 +63,7 @@ def format_as_c(params, *,expand_msg=False):
         print(s,end=end,file=out)
 
     # Generate the inputs
-    messages, mprimes, mus = gen_mldas_inputs(params)
+    messages, mprimes, mus = gen_mldsa_inputs(params)
 
     # Output them as C variables
     def print_c_byte_array(name,dat,end='\n'):
@@ -139,7 +139,7 @@ def format_as_sv(params, *,expand_msg=False):
     def p(s,end='\n'):
         print(s,end=end,file=out)
     # Generate the inputs
-    messages, mprimes, mus = gen_mldas_inputs(params)
+    messages, mprimes, mus = gen_mldsa_inputs(params)
 
     def int_as_sv_u64(name, v):
         if not isinstance(v,int):

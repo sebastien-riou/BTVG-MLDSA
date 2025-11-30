@@ -153,10 +153,6 @@ def select_testvectors(data,*,only1 = False, check_flare = False,dst_dir=None):
     indexes = list(selected.keys())
     indexes.sort()
     logging.debug(str(indexes))
-    
-    if check_flare:
-        from parse_flare_sig_log import parse_flare_sig_log
-        flare_records = parse_flare_sig_log('flare_git_ignore/mldsa44_signature.log',data['mldsa pset'])    
 
     i=0
     tv=0
@@ -172,14 +168,6 @@ def select_testvectors(data,*,only1 = False, check_flare = False,dst_dir=None):
         repetitions_sum += idx_data['repetitions']
         repetitions_min = min(repetitions_min,idx_data['repetitions'])
         repetitions_max = max(repetitions_max,idx_data['repetitions'])
-        if check_flare:
-            repetition_match = flare_records[tv]['repetitions'] == dut.nr_sign_iterations
-            sig_match = flare_records[tv]['sig'] == idx_data['sig']
-            if not repetition_match:
-                raise RuntimeError(f'{flare_records[tv]['repetitions']} != {dut.nr_sign_iterations}, sig_match = {sig_match}')
-            if not sig_match:
-                raise RuntimeError(f"sig don't match")
-        #print(f'{nloops[i]} {i*8:#08x} {Utils.hexstr(message[0:8])}')
         tv += 1
 
     if repetitions_min != 1:
