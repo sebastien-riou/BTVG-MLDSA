@@ -1,0 +1,8 @@
+[submodule "mldsa-native"]
+	path = mldsa-native
+	url = https://github.com/sebastien-riou/mldsa-native.git
+	branch = tvgen
+[submodule "dilithium_py"]
+	path = dilithium_py
+	url = https://github.com/sebastien-riou/dilithium-py.git
+	branch = instrumented

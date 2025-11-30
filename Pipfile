@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pysatl = "*"
+numpy = "*"
+pycryptodome = "*"
+tqdm = "*"
+hdrbg = "*"
+xoflib = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"

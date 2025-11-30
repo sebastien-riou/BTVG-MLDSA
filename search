@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -e
+
+PSET=$1
+MIN_REPETITIONS=$2
+NTRIALS=$3
+SEED=$4
+PARALLEL=$5
+
+mkdir -p results
+
+for (( i=0; i<$PARALLEL; i+=1 ))
+do
+    set -x
+    ./mldsa-tv-gen mldsa$PSET --min-repetitions=$MIN_REPETITIONS --hdrbg-seed=$i$SEED --n-trials=$NTRIALS ${@: 6} > results/mldsa${PSET}-s${i}${SEED}.log &
+    set +x
+done

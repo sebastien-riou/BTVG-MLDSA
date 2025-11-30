@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -ex 
+
+./clean
+
+pushd hdrbg
+./buildit
+popd
+
+DEBUG_FLAGS="-g -Og"
+RELEASE_FLAGS=""
+FLAGS=$RELEASE_FLAGS
+#cp ../examples/monolithic_build_multilevel_native/build/mldsa/mldsa_native.S.o .
+#gcc $FLAGS -DMLD_FORCE_X86_64 -mavx2 -mbmi2 -I . -I hdrbg main.c  mldsa_native.S.o hdrbg/libhdrbg.a
+#gcc $FLAGS -I . -I hdrbg main.c hdrbg/libhdrbg.a
+
+pushd mldsa-native
+./scripts/tests kat --cflags="-DINSTRUMENTATION=1" --opt OPT --no-run
+popd
+
+#cp mldsa-native/test/build/*.a .
+gcc $FLAGS -I . -I hdrbg main.c hdrbg/libhdrbg.a -Lmldsa-native/test/build/ -lmldsa44  -lmldsa65 -lmldsa87 -o mldsa-tv-gen
+
+#./a.out mldsa87 $*

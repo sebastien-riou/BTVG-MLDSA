@@ -1,0 +1,8 @@
+#!/bin/bash
+
+PSET=$1
+MSG_SIZE=$2
+HDRBG_SEED=$3
+
+mkdir -p results
+time ./mldsa-tv-gen $PSET --msg-size=$MSG_SIZE --hdrbg-seed=$HDRBG_SEED ${@: 4} > results/aborts-${PSET}-m${MSG_SIZE}-s${HDRBG_SEED}.log

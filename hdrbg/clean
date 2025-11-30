@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -ex 
+
+rm -f libhdrbg.a
+rm -f *.o

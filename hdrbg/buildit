@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#code taken from https://github.com/tfpf/hash-drbg (+ modifications)
+set -ex
+
+rm -f libhdrbg.a
+gcc -c sha256.c -o sha256.o
+gcc -c extras.c -o extras.o
+gcc -c hdrbg.c -o hdrbg.o
+ar rcs libhdrbg.a sha256.o extras.o hdrbg.o
+rm -f *.o

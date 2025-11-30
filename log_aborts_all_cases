@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -ex
+
+HDRBG_SEED=$1
+./log_aborts_all_msg_sizes 44 $HDRBG_SEED ${@: 2} &> mldsa44_timings_$HDRBG_SEED.log
+./log_aborts_all_msg_sizes 65 $HDRBG_SEED ${@: 2} &> mldsa65_timings_$HDRBG_SEED.log
+./log_aborts_all_msg_sizes 87 $HDRBG_SEED ${@: 2} &> mldsa87_timings_$HDRBG_SEED.log
+
+echo "All data generated for hdrbg seed $HDRBG_SEED"
