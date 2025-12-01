@@ -1,6 +1,7 @@
 *.a 
 *.tar.gz
 results/
+*_git_ignore
 mldsa-tv-gen
 # Byte-compiled / optimized / DLL files
 __pycache__/
