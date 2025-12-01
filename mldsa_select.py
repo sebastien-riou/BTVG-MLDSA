@@ -26,7 +26,7 @@ def get_mldsa_impl(paramset:int):
 #- max repetition number (from the captured cases)
 #- has average matching theoritical average (i.e. 3.85 for ML-DSA-87)
 
-def select_testvectors(data,*,only1 = False, check_flare = False,dst_dir=None):
+def select_testvectors(data,*,only1 = False, dst_dir=None):
     match(data['mldsa pset']):
         case 44:
             target_average = 4.25
@@ -44,13 +44,18 @@ def select_testvectors(data,*,only1 = False, check_flare = False,dst_dir=None):
     dut = get_mldsa_impl(paramset=data['mldsa pset'])
     zeta = bytearray()
     zeta += drbg.get_bytes(32)
-    #print(Utils.hexstr(zeta))
+    logging.debug(f'zeta = {Utils.hexstr(zeta)}')
 
     pk, sk = dut.key_derive(seed=zeta)
     logging.debug(f'private key = {Utils.hexstr(sk)}')
-    logging.debug(f'private key = {Utils.hexstr(pk)}')
+    logging.debug(f'public key = {Utils.hexstr(pk)}')
     if pk != data['pk']:
-        raise RuntimeError('pk does not match')
+        if len(pk) != len(data['pk']):
+            raise RuntimeError(f"pk length does not match: {len(pk)} vs {len(data['pk'])}")
+        for i in range(0,len(pk)):
+            if pk[i] != data['pk'][i]:
+                raise RuntimeError(f"pk does not match at index {i} ({pk[i]:#02x} vs {data['pk'][i]:#02x})!")
+        raise RuntimeError('pk does not match somehow!')
     if sk != data['sk']:
         raise RuntimeError('sk does not match')
     if data['ctx size'] > 0:
@@ -76,7 +81,7 @@ def select_testvectors(data,*,only1 = False, check_flare = False,dst_dir=None):
     max_loops = max(data['repetitions'])
     min_loops = min(data['repetitions'])
 
-    print(f'{len(data['repetitions'])} signatures: repetitions between {min_loops} and {max_loops} included')
+    logging.info(f'{len(data['repetitions'])} signatures: repetitions between {min_loops} and {max_loops} included')
 
     if min_loops > 1:
         raise RuntimeError("the data set does not contain the minimal number of repetition")
@@ -146,9 +151,9 @@ def select_testvectors(data,*,only1 = False, check_flare = False,dst_dir=None):
 
         selection()
 
-    print(len(selected))
+    logging.info(f"Number of selected messages: {len(selected)}")
     logging.debug(str(selected))
-    print(f'average = {selected_ave}')
+    logging.info(f'Average repetitions = {selected_ave}')
 
     indexes = list(selected.keys())
     indexes.sort()
