@@ -12,7 +12,7 @@ Benchmarking Test Vectors Generator for MLDSA sign
 ### the easy way
 This generate test vectors using a single process, so this is limited to development and quick demos.
 
-1. use `log_aborts_all_cases` script to generate candidate test vectors for all ML-DSA key sizes and all message sizes, i.e., `./log_aborts_all_cases 00 --n-trials=1K`
+1. use `log_aborts_all_cases` script to generate candidate test vectors for all ML-DSA key sizes and all message sizes, i.e., `./log_aborts_all_cases 00 --n-trials=10K`
 2. use `mldsa-sign-tvgen.py` script to generate the test vectors, i.e. `pipenv run python mldsa-sign-tvgen.py --read-log results/`
 
 
