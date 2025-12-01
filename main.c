@@ -138,6 +138,7 @@ int main(int argc, const char*argv[]){
     uint64_t ntrials = 1000*1000;
     unsigned int min_repetitions = 1;
     unsigned int exact_repetitions = 0;
+    unsigned int only1 = 0;
 /*
     {
       uint8_t entropy[32] = {0};
@@ -210,6 +211,11 @@ int main(int argc, const char*argv[]){
       const char*exact_str = "--exact-repetitions";
       if(0==memcmp(argv[i],exact_str,strlen(exact_str))){
         exact_repetitions = 1;
+        continue;
+      }
+      const char*only1_str = "--only1";
+      if(0==memcmp(argv[i],only1_str,strlen(only1_str))){
+        only1 = 1;
         continue;
       }
       const char*mldsa44_str = "mldsa44";
@@ -393,7 +399,7 @@ int main(int argc, const char*argv[]){
           }else{
             printf("\r%10lu,%2u\n",idx,mldsa_native_repetitions);
           }
-          //if(exact_repetitions) break;
+          if(only1) break;
           //if(min_repetitions>1){
           //  min_repetitions = mldsa_native_repetitions + 1;
           //}

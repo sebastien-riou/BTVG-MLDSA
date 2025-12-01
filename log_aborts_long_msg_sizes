@@ -4,5 +4,5 @@ set -ex
 
 PSET=$1
 HDRBG_SEED=$2
-./log_aborts mldsa$PSET 10K $HDRBG_SEED ${@: 3} --exact-repetitions --min-repetitions=1 
-./log_aborts mldsa$PSET 1M  $HDRBG_SEED ${@: 3} --exact-repetitions --min-repetitions=1 
+./log_aborts mldsa$PSET 10K $HDRBG_SEED ${@: 3} --only1 --exact-repetitions --min-repetitions=1 
+./log_aborts mldsa$PSET 1M  $HDRBG_SEED ${@: 3} --only1 --exact-repetitions --min-repetitions=1 
