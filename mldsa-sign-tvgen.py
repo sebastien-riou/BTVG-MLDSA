@@ -246,7 +246,7 @@ if __name__ == '__main__':
                 max_repetitions.append('0')
     
     if common_prob_power:
-        archive_name = f"mldsa-min-probability-m{msg_cnt}-p{best_sel_power_probs[0]}-r{'-'.join(max_repetitions)}.tar.gz"
+        archive_name = f"mldsa-p{best_sel_power_probs[0]}-m{msg_cnt}-r{'-'.join(max_repetitions)}.tar.gz"
     else:
         archive_name = f"mldsa-max-repetition-m{msg_cnt}-r{'-'.join(max_repetitions)}.tar.gz"
     import tarfile 
