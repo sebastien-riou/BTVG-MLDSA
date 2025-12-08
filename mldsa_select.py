@@ -4,6 +4,7 @@ import hdrbg
 import hashlib
 import copy
 import logging
+import io
 from pysatl import Utils
 
 import gen_mldsa_inputs
@@ -191,22 +192,43 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
     if dst_dir:
         base_name = os.path.join(dst_dir,base_name)
     out_file = base_name+'.sel.py'
-    with open(out_file,'w') as f:
-        def p(s):
-            print(s,file=f)
-        p(f'hdrbg_seed = {data['hdrbg seed']}')
-        p(f'mldsa_seed = {data['mldsa seed']}')
-        p(f'sk = {data['sk']}')
-        p(f'pk = {data['pk']}')
-        p(f'mldsa_pset = {data['mldsa pset']}')
-        p(f'ctx_size = {data['ctx size']}')
-        p(f'msg_size = {data['msg size']}')
-        p(f'indexes = {indexes}')
-        p(f'repetitions = {repetitions}')
-        p(f'average = {selected_ave}')
-        p(f'max_repetitions = {max_loops}')
-        p(f'sigs_sha256_digest = {digest}')
+    params = {}
+    params['hdrbg_seed'] = data['hdrbg seed']
+    params['mldsa_seed'] = data['mldsa seed']
+    params['sk'] = data['sk']
+    params['pk'] = data['pk']
+    params['mldsa_pset'] = data['mldsa pset']
+    params['ctx_size'] = data['ctx size']
+    params['msg_size'] = data['msg size']
+    params['indexes'] = indexes
+    params['repetitions'] = repetitions
+    params['average'] = selected_ave
+    params['max_repetitions'] = max_loops
+    params['sigs_sha256_digest'] = digest
+    write_params(out_file,params)
     return out_file
+
+def params_to_str(params):
+    out = io.StringIO()
+    def p(s):
+        print(s,file=out)
+    p(f'hdrbg_seed = {params['hdrbg_seed']}')
+    p(f'mldsa_seed = {params['mldsa_seed']}')
+    p(f'sk = {params['sk']}')
+    p(f'pk = {params['pk']}')
+    p(f'mldsa_pset = {params['mldsa_pset']}')
+    p(f'ctx_size = {params['ctx_size']}')
+    p(f'msg_size = {params['msg_size']}')
+    p(f'indexes = {params['indexes']}')
+    p(f'repetitions = {params['repetitions']}')
+    p(f'average = {params['average']}')
+    p(f'max_repetitions = {params['max_repetitions']}')
+    p(f'sigs_sha256_digest = {params['sigs_sha256_digest']}')
+    return out.getvalue()
+
+def write_params(dst,params):
+    with open(dst,'w') as f:
+        print(params_to_str(params),file=f)
 
 if __name__ == '__main__':
     import parse_aborts
