@@ -1,4 +1,5 @@
 import argparse
+import copy
 import logging
 import os
 import runpy
@@ -23,17 +24,23 @@ def pset_to_average_repetitions(pset:int):
             raise RuntimeError()
     return target_average
 
-def repetitions_to_prob_power(pset: int, repetitions: int) -> int:
+def repetitions_to_prob_power(pset: int, repetitions: int, floor=True):
     ave = pset_to_average_repetitions(pset)
     base = (ave-1)/ave
     prob_power = -math.log(base**repetitions) / math.log(2)
-    return math.floor(prob_power)
+    if floor:
+        return math.floor(prob_power)
+    else:
+        return prob_power
 
-def prob_power_to_repetitions(pset: int, prob_power: int) -> int:
+def prob_power_to_repetitions(pset: int, prob_power: int, ceil=True):
     ave = pset_to_average_repetitions(pset)
     base = (ave-1)/ave
     repetitions = math.log(2**-prob_power)/math.log(base)
-    return math.ceil(repetitions)
+    if ceil:
+        return math.ceil(repetitions)
+    else:
+        return repetitions
 
 if __name__ == '__main__':
     scriptname = os.path.basename(__file__)
@@ -49,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--read-log', default=None, help='Path to result log files already generated (.log)', type=str)
     parser.add_argument('--read-sel', default=None, help='Path to result selection files already generated (.sel.py)', type=str)
     parser.add_argument('--write', default=None, help='Path to write result files', type=str)
+    parser.add_argument('--remove-empty', default=False, help='Remove files with no results', type=bool)
     
     args = parser.parse_args()
     logformat = '%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s'
@@ -85,51 +93,103 @@ if __name__ == '__main__':
         result_files = [os.path.join(results_dir, f) for f in os.listdir(results_dir) if f.endswith('.log')]
         result_files = [f for f in result_files if os.path.isfile(f) ]
         best_data = {}
+        best_data_dropped = {}
         prob_powers = {}
         print(f'Loading {len(result_files)} result files.')
         for f in result_files:
             logging.debug(f)
             data = parse_aborts.parse_aborts(f)
             if 0==len(data['records']):
+                if(args.remove_empty):
+                    logging.info(f'Removing empty file : {f}')
+                    os.remove(f)
+                else:
+                    logging.warning(f'Empty file could be removed, see --remove-empty: {f}')
                 continue
-            data['file'] = f
-
-            key = f"{data['mldsa pset']}-{data['msg size']}"
             
+            data['file'] = f
+            pset = data['mldsa pset']
+            key = f"{pset}-{data['msg size']}"
             data['prob_powers']=[]
+
+            max_repetitions = min(data['repetitions'])
+            last_dropped = None
             for i in range(0,len(data['repetitions'])):
                 r = data['repetitions'][i]
-                prob_power = repetitions_to_prob_power(data['mldsa pset'],r)
+                prob_power = repetitions_to_prob_power(pset,r)
                 data['prob_powers'].append(prob_power)
                 if 69 == data['msg size']:
                     prob_power_data = {}
                     prob_power_data['iterations'] = [data['iterations'][i]]
-                    prob_power_data['repetitions'] = [data['repetitions'][i]]
+                    prob_power_data['repetitions'] = [r]
                     prob_power_data['hdrbg seed'] = data['hdrbg seed']
                     prob_power_data['mldsa seed'] = data['mldsa seed']
-                    prob_power_data['mldsa pset'] = data['mldsa pset']
+                    prob_power_data['mldsa pset'] = pset
                     prob_power_data['pk'] = data['pk']
                     prob_power_data['sk'] = data['sk']
+                    prob_power_data['file'] = f
                     
                     if prob_power not in prob_powers: 
                         prob_powers[prob_power] = {}
+                    if key in prob_powers[prob_power]:
+                        if prob_powers[prob_power][key]['repetitions'][0] < r:
+                            logging.debug(f"Drop case {r} (p{prob_power}) from file {f}")
+                            last_dropped = prob_power_data
+                            continue #ignore this one as it has a higher repetition but same probability (due to rounding to integers)
+                        else:
+                            logging.debug(f"Drop case (2) {prob_powers[prob_power][key]['repetitions'][0]} (p{prob_power}) from file {prob_powers[prob_power][key]['file']}")
+                            last_dropped = prob_powers[prob_power].pop(key)
                     prob_powers[prob_power][key] = prob_power_data
+                max_repetitions = max(max_repetitions,r)
 
-            max_repetitions = max(data['repetitions'])
+            real_max_repetitions = max(data['repetitions'])
+            if real_max_repetitions != max_repetitions:
+                if pset == 44 and real_max_repetitions > 100:
+                    logging.debug(f"Real max repetition is {real_max_repetitions} but we keep the data for {max_repetitions} because it has same integer power probability")
+                    logging.debug(f"Dropped data is in {last_dropped['file']}")
             index = data['repetitions'].index(max_repetitions)
             max_repetitions_iteration = data['iterations'][index]
 
             if key in best_data:
                 best_max_repetitions = best_data[key]['max_repetitions']
+                best_prob = repetitions_to_prob_power(pset, best_max_repetitions)
             else:
                 best_max_repetitions = 0
-            if max_repetitions > best_max_repetitions:
+                best_prob = -1
+            max_prob = repetitions_to_prob_power(pset, max_repetitions)
+
+            takeit = False
+            if max_prob > best_prob:
+                takeit = True
+                if last_dropped and (last_dropped['repetitions'][0] > best_max_repetitions):
+                    logging.debug(f'New best dropped 1 for {pset}: {last_dropped['repetitions'][0]} vs {best_max_repetitions}')
+                    best_data_dropped[key] = copy.deepcopy(last_dropped)
+                elif key in best_data_dropped:
+                    logging.debug(f'Remove best dropped for {pset}')
+                    best_data_dropped.pop(key)
+            elif max_prob == best_prob:
+                if max_repetitions < best_max_repetitions:
+                    takeit = True
+                    if key in best_data:
+                        logging.debug(f'New best dropped 2 for {pset}')
+                        best_data_dropped[key] = copy.deepcopy(best_data[key])
+
+            if last_dropped:
+                logging.debug(f"last_dropped: {last_dropped['repetitions'][0]}, takeit={takeit}, max_repetition={max_repetitions}, best_max_repetitions={best_max_repetitions}. {max_prob} vs {best_prob}")
+            else:
+                logging.debug(f"takeit={takeit}, max_repetition={max_repetitions}, best_max_repetitions={best_max_repetitions}. {max_prob} vs {best_prob}")
+
+            if takeit:
                 data['max_repetitions'] = max_repetitions
                 data['max_repetitions_iteration'] = max_repetitions_iteration
                 best_data[key] = data
-                #print('new best')
-            #print(f'mldsa{data['mldsa pset']} - msg size = {data['msg size']:7} - hdrbg seed = {Utils.hexstr(data['hdrbg seed'])} - max repetitions = {max_repetitions}')
-        
+            else:
+                if key in best_data_dropped:
+                    if best_data_dropped[key]['repetitions'][0] < last_dropped['repetitions'][0]:
+                        logging.debug(f'New best dropped 3 for {pset}')
+                        best_data_dropped[key] = copy.deepcopy(last_dropped)
+
+        logging.debug(f"best_data keys:{sorted(best_data.keys())}")
 
         all_prob_powers = sorted(prob_powers.keys(),reverse=True)
         highest_common_prob_power = None
@@ -137,14 +197,30 @@ if __name__ == '__main__':
             #print(prob_powers[p])
             if 3 == len(prob_powers[p]): #we want the same probability for the 3 ML-DSA key sizes
                 highest_common_prob_power = p 
-                logging.debug(f'highest_common_prob_power = {highest_common_prob_power}')
+                logging.info(f"highest_common_prob_power = {highest_common_prob_power}:\n\t{prob_powers[p]['44-69']['file']}\n\t{prob_powers[p]['65-69']['file']}\n\t{prob_powers[p]['87-69']['file']}")
                 break
+
+        for key in sorted(best_data_dropped.keys()):
+            data = best_data_dropped[key]
+            pset = data['mldsa pset']
+            repetitions = data['repetitions'][0]
+            logging.info(f"ML-DSA-{pset}: dropped max repetitions case {repetitions} (p{repetitions_to_prob_power(pset, repetitions)}) from file {data['file']}")
+
+        for pset in [44,65,87]:
+            key = f"{pset}-69"
+            pset_prob_powers = {}
+            for p in prob_powers.keys():
+                if key in prob_powers[p].keys():
+                    pset_prob_powers[p] = {'file':prob_powers[p][key]['file'],'repetitions':prob_powers[p][key]['repetitions'][0]}
+            max_p = max(list(pset_prob_powers.keys()))
+            # Note: we don't use prob_power_to_repetitions(pset,max_p) because sometime when reporting integers the mapping is not unique (can be off by +/- 1)
+            logging.info(f"ML-DSA-{pset} max repetition case {pset_prob_powers[max_p]['repetitions']} (p{max_p}): {pset_prob_powers[max_p]['file']}")
 
         if highest_common_prob_power is None:
             logging.warning(f'No common prob power found in the data set')
         else:
             logging.debug('Replacing best_data with the highest common prob power')
-            for key in best_data.keys():
+            for key in sorted(best_data.keys()):
                 data = best_data[key]
                 if 69 == data['msg size']:
                     prob_power_data = prob_powers[highest_common_prob_power][key]
@@ -161,10 +237,12 @@ if __name__ == '__main__':
                     data['mldsa seed'] = prob_power_data['mldsa seed']
                     data['pk'] = prob_power_data['pk']
                     data['sk'] = prob_power_data['sk']
+                    data['file'] = prob_power_data['file']
                     data['max_repetitions_iteration'] = prob_power_data['iterations'][0]
                     common_prob_max_repetition = prob_power_data['repetitions'][0]
                     if max_repetitions > common_prob_max_repetition:
-                        logging.warning(f"Dropping ML-DSA-{data['mldsa pset']} max repetition case {max_repetitions} to {common_prob_max_repetition} to achieve common probability")
+                        pset=data['mldsa pset']
+                        logging.warning(f"Dropping ML-DSA-{pset} max repetition case {max_repetitions} (p{repetitions_to_prob_power(pset,max_repetitions)}) to {common_prob_max_repetition} to achieve common probability p{repetitions_to_prob_power(pset,common_prob_max_repetition)}")
                     data['max_repetitions'] = common_prob_max_repetition
                     best_data[key] = data
 
@@ -225,6 +303,7 @@ if __name__ == '__main__':
         out=[]
         out.append(['c',gen_mldsa_inputs.format_as_c(params)])
         out.append(['sv',gen_mldsa_inputs.format_as_sv(params)])
+        out.append(['.sel.py',mldsa_select.params_to_str(params)])
         
         key = f"mldsa{params['mldsa_pset']}-m{gen_mldsa_inputs.size_str(params['msg_size'])}"
         max_repetitions_dict[key]=str(params['max_repetitions'])
