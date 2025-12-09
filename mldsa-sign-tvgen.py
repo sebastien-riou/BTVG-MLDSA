@@ -329,6 +329,6 @@ if __name__ == '__main__':
     else:
         archive_name = f"mldsa-max-repetition-m{msg_cnt}-r{'-'.join(max_repetitions)}.tar.gz"
     import tarfile 
-    with tarfile.open(archive_name, 'w:gz') as archive:
+    with tarfile.open(os.path.join(dst_dir,archive_name), 'w:gz') as archive:
         for f in files:
             archive.add(f,arcname = os.path.basename(f))
