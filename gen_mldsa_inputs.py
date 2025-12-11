@@ -33,10 +33,12 @@ def gen_mldsa_inputs(params):
     message = bytearray(msg_size)
 
     indexes = params['indexes']
+    message_size = params['msg_size']
     messages = []
     for idx in indexes:
         drbg_msg_tmp = copy.deepcopy(drbg_msg)
-        message[0:8] = drbg_msg_tmp.get_bytes(8,additional_input=idx.to_bytes(8,byteorder='little')) 
+        hbound = min(8,message_size)
+        message[0:hbound] = drbg_msg_tmp.get_bytes(hbound,additional_input=idx.to_bytes(8,byteorder='little')) 
         messages.append(bytes(message))
 
     # Compute M' for Sign_Internal

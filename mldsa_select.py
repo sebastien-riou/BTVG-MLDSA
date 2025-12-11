@@ -66,7 +66,8 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
 
     def index_to_data(idx):
         drbg_msg_tmp = copy.deepcopy(drbg_msg)
-        message[0:8] = drbg_msg_tmp.get_bytes(8,additional_input=idx.to_bytes(8,byteorder='little')) 
+        hbound = min(8,message_size)
+        message[0:hbound] = drbg_msg_tmp.get_bytes(hbound,additional_input=idx.to_bytes(8,byteorder='little')) 
 
         sig = dut.sign(sk=sk,m=message,ctx=bytes(0),deterministic=True)
         logging.debug(f'{idx:5} {dut.nr_sign_iterations:3} {dut.check_z_fail:2} {dut.check_r_fail:2} {dut.check_t0_fail:2} {dut.check_h_fail:2} {Utils.hexstr(message[0:8])}')
