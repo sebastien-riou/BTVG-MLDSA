@@ -212,6 +212,9 @@ if __name__ == '__main__':
             for p in prob_powers.keys():
                 if key in prob_powers[p].keys():
                     pset_prob_powers[p] = {'file':prob_powers[p][key]['file'],'repetitions':prob_powers[p][key]['repetitions'][0]}
+            if 0 == len(pset_prob_powers):
+                logging.info(f"ML-DSA-{pset}: no data for m69")
+                continue
             max_p = max(list(pset_prob_powers.keys()))
             # Note: we don't use prob_power_to_repetitions(pset,max_p) because sometime when reporting integers the mapping is not unique (can be off by +/- 1)
             logging.info(f"ML-DSA-{pset} max repetition case {pset_prob_powers[max_p]['repetitions']} (p{max_p}): {pset_prob_powers[max_p]['file']}")
@@ -251,7 +254,7 @@ if __name__ == '__main__':
             if args.search:
                 print(f'file {data['file']}')
             else:
-                only1 = data['msg size'] > 69
+                only1 = data['msg size'] != 69
                 sel_files.append(mldsa_select.select_testvectors(data,dst_dir=dst_dir, only1=only1))
         if args.search:
             exit()
@@ -303,7 +306,7 @@ if __name__ == '__main__':
         out=[]
         out.append(['c',gen_mldsa_inputs.format_as_c(params)])
         out.append(['sv',gen_mldsa_inputs.format_as_sv(params)])
-        out.append(['.sel.py',mldsa_select.params_to_str(params)])
+        out.append(['sel.py',mldsa_select.params_to_str(params)])
         
         key = f"mldsa{params['mldsa_pset']}-m{gen_mldsa_inputs.size_str(params['msg_size'])}"
         max_repetitions_dict[key]=str(params['max_repetitions'])
