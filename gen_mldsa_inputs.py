@@ -81,20 +81,43 @@ def format_as_c(params, *,expand_msg=False):
         dat = params[name]
         print_c_byte_array(name,dat)
 
+    def print_c_ui_array(name,dat,end='\n'):
+        if name:
+            decl = f'.{name} = '
+            comma = ','
+        else:
+            decl = ''
+            comma = ''
+        p(f"{decl} {{",end="")
+        sep=""
+        for e in dat:
+            p(f"{sep}{e}",end="")
+            sep=", "
+        p(f"}}{comma}",end=end)
+
+    def print_param_as_c_ui_array(name):
+        dat = params[name]
+        print_c_ui_array(name,dat)
+
     base_type_name = f"mldsa{params['mldsa_pset']}_m{size_str(len(messages[0]))}_test_vectors"
 
     #struct declaration
+    nmessages = len(messages)
+    message_size = len(messages[0])
+    m_size = min(8,message_size)
     p(f"typedef struct {base_type_name}_struct {{")
     p(f'\tunsigned int mldsa_pset;')
     p(f'\tuint8_t hdrbg_seed[8];')
     p(f'\tuint8_t mldsa_seed[32];')
     p(f"\tuint8_t sk[{len(params['sk'])}];")
     p(f"\tuint8_t pk[{len(params['pk'])}];")
+    p(f'\tunsigned int nmessages;')
+    p(f"\tunsigned int repetitions[{nmessages}];")
     p(f'\tunsigned int message_size;')
-    p(f"\tuint8_t sign_messages[{len(messages)}][8];")
+    p(f"\tuint8_t sign_messages[{nmessages}][{m_size}];")
     p(f'\tunsigned int internal_message_size;')
-    p(f"\tuint8_t sign_internal_messages[{len(messages)}][10];")
-    p(f"\tuint8_t sign_external_mu[{len(messages)}][64];")
+    p(f"\tuint8_t sign_internal_messages[{nmessages}][10];")
+    p(f"\tuint8_t sign_external_mu[{nmessages}][64];")
     p(f'\tuint8_t sigs_sha256_digest[32];')
     p(f"}} {base_type_name}_t;")
 
@@ -106,8 +129,11 @@ def format_as_c(params, *,expand_msg=False):
     print_param_as_c_byte_array('sk')
     print_param_as_c_byte_array('pk')
 
-    p(f'.message_size = {len(messages[0])},')
-    mprime_size = len(messages[0])+2
+    p(f".nmessages = {nmessages},")
+    print_param_as_c_ui_array('repetitions')
+    
+    p(f'.message_size = {message_size},')
+    mprime_size = message_size+2
     
     def decl_messages(name,data):
         p(f'.{name} = {{')
