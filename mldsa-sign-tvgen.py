@@ -249,6 +249,7 @@ if __name__ == '__main__':
                     data['max_repetitions'] = common_prob_max_repetition
                     best_data[key] = data
 
+        os.makedirs(dst_dir,exist_ok=True)
         for key,data in best_data.items():
             print(f'mldsa{data['mldsa pset']} - msg size = {gen_mldsa_inputs.size_str(data['msg size'])} - hdrbg seed = {Utils.hexstr(data['hdrbg seed'])} - iteration {data['max_repetitions_iteration']} - max repetitions = {data['max_repetitions']}')
             if args.search:
@@ -302,6 +303,7 @@ if __name__ == '__main__':
     max_repetitions_dict = {}
     msg_cnt = 0
     files = []
+    os.makedirs(dst_dir,exist_ok=True)
     for params in best_sel.values():
         out=[]
         out.append(['c',gen_mldsa_inputs.format_as_c(params)])
