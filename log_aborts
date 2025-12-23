@@ -3,6 +3,7 @@
 PSET=$1
 MSG_SIZE=$2
 HDRBG_SEED=$3
+LOG_PREFIX=$4
 
 mkdir -p results
-time ./mldsa-tv-gen $PSET --msg-size=$MSG_SIZE --hdrbg-seed=$HDRBG_SEED ${@: 4} > results/aborts-${PSET}-m${MSG_SIZE}-s${HDRBG_SEED}.log
+time ./mldsa-tv-gen $PSET --msg-size=$MSG_SIZE --hdrbg-seed=$HDRBG_SEED ${@: 5} > results/${LOG_PREFIX}-${PSET}-m${MSG_SIZE}-s${HDRBG_SEED}.log

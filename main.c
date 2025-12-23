@@ -90,7 +90,12 @@ extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_repetitions;
 extern uint32_t PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_repetitions_causes[4];
 extern uint32_t PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_repetitions_causes[4];
 extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_repetitions_causes[4];
-
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_blocks;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_blocks;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_blocks;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_bytes;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_bytes;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_bytes;
 
 void randombytes(uint8_t *buf, size_t n){
   memset(buf,0,n);//we want deterministic mode, not hedged mode.
@@ -138,7 +143,10 @@ int main(int argc, const char*argv[]){
     uint64_t ntrials = 1000*1000;
     unsigned int min_repetitions = 1;
     unsigned int exact_repetitions = 0;
-    unsigned int only1 = 0;
+    unsigned int stop_at = 0;
+    unsigned int min_sib_bytes = 0;
+    unsigned int exact_sib_bytes = 0;
+    
 /*
     {
       uint8_t entropy[32] = {0};
@@ -213,9 +221,21 @@ int main(int argc, const char*argv[]){
         exact_repetitions = 1;
         continue;
       }
-      const char*only1_str = "--only1";
-      if(0==memcmp(argv[i],only1_str,strlen(only1_str))){
-        only1 = 1;
+      const char*min_sib_bytes_str = "--min-sib-bytes=";
+      if(0==memcmp(argv[i],min_sib_bytes_str,strlen(min_sib_bytes_str))){
+        const char*min_sib_bytes_val_str = argv[i]+strlen(min_sib_bytes_str);
+        min_sib_bytes = strtoull(min_sib_bytes_val_str,0,0);
+        continue;
+      }
+      const char*exact_sib_bytes_str = "--exact-sib-bytes";
+      if(0==memcmp(argv[i],exact_sib_bytes_str,strlen(exact_sib_bytes_str))){
+        exact_sib_bytes = 1;
+        continue;
+      }
+      const char*stop_at_str = "--stop-at=";
+      if(0==memcmp(argv[i],stop_at_str,strlen(stop_at_str))){
+        const char*stop_at_val_str = argv[i]+strlen(stop_at_str);
+        stop_at = strtoull(stop_at_val_str,0,0);
         continue;
       }
       const char*mldsa44_str = "mldsa44";
@@ -244,31 +264,52 @@ int main(int argc, const char*argv[]){
     const uint32_t pset = (mldsa87<<2)|(mldsa65<<1)|mldsa44;
     size_t sksize,pksize,sigsize;
     unsigned int mldsa_pset;
+    unsigned int tau;
     switch(pset){
       case MLDSA44:
         mldsa_pset=44;
         sksize=MLDSA44_SECRETKEYBYTES;
         pksize=MLDSA44_PUBLICKEYBYTES;
         sigsize=MLDSA44_BYTES;
+        tau = 39;
         break;
       case MLDSA65:
         mldsa_pset=65;
         sksize=MLDSA65_SECRETKEYBYTES;
         pksize=MLDSA65_PUBLICKEYBYTES;
         sigsize=MLDSA65_BYTES;
+        tau = 49;
         break;
       case MLDSA87:
         mldsa_pset=87;
         sksize=MLDSA87_SECRETKEYBYTES;
         pksize=MLDSA87_PUBLICKEYBYTES;
         sigsize=MLDSA87_BYTES;
+        tau = 60;
         break;
       default:
         if(0==pset) printf("ERROR unsupported command line: need exactly one mldsa* argument, none have been found.\n");
-        else printf("ERROR unsupported command line: need exactly one mldsa* argument, several have been found.");
+        else printf("ERROR unsupported command line: need exactly one mldsa* argument, several have been found.\n");
         abort();
     }
-
+    if(0==min_sib_bytes){
+      min_sib_bytes = tau;
+    }else{
+      if( (!exact_repetitions) || (min_repetitions>1)){
+        printf("ERROR unconsistent command line: --min-sib-bytes requires --exact-repetitions --min-repetitions=1.\n");
+        abort();
+      }
+    }
+    if(exact_sib_bytes){
+      if( (!exact_repetitions) || (min_repetitions>1)){
+        printf("ERROR unconsistent command line: --exact-sib-bytes requires --exact-repetitions --min-repetitions=1.\n");
+        abort();
+      }
+      if(min_sib_bytes<tau){
+        printf("ERROR unconsistent command line: --min-sib-bytes=%u but tau=%u.\n",min_sib_bytes,tau);
+        abort();
+      }
+    }
     uint32_t err_code=0;
     uint8_t*message=0;
     uint64_t sum_rep=0,total_sum_rep=0;
@@ -329,24 +370,32 @@ int main(int argc, const char*argv[]){
         //dump(message,8);
         uint32_t mldsa_native_repetitions;
         uint32_t*causes=0;
+        uint32_t sib_blocks;
+        uint32_t sib_bytes;
         switch(mldsa_pset){
           case 44: if(mldsa44_signature(sig,&sigsize,message, message_size, 0, 0, sk)){
               throw_exception(__LINE__);
             }
             mldsa_native_repetitions=PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_repetitions;
             causes = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_repetitions_causes;
+            sib_blocks = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_blocks;
+            sib_bytes = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_bytes;
             break;
           case 65: if(mldsa65_signature(sig,&sigsize,message, message_size, 0, 0, sk)){
               throw_exception(__LINE__);
             }
             mldsa_native_repetitions=PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_repetitions;
             causes = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_repetitions_causes;
+            sib_blocks = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_blocks;
+            sib_bytes = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_bytes;
             break;
           case 87: if(mldsa87_signature(sig,&sigsize,message, message_size, 0, 0, sk)){
               throw_exception(__LINE__);
             }
             mldsa_native_repetitions=PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_repetitions;
             causes = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_repetitions_causes;
+            sib_blocks = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_blocks;
+            sib_bytes = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_bytes;
             break;
           default:
             throw_exception(__LINE__);
@@ -379,8 +428,15 @@ int main(int argc, const char*argv[]){
         total_sum_t0+= causes[2];
         total_sum_h += causes[3];
         //printf("repetitions = %u\n",mldsa_native_repetitions);
-        if(mldsa_native_repetitions >= min_repetitions){
-          if(exact_repetitions && (mldsa_native_repetitions != min_repetitions)) continue;
+        bool exact_repetition_mismatch = exact_repetitions && (mldsa_native_repetitions != min_repetitions);
+        bool exact_sib_bytes_mismatch = exact_sib_bytes && (sib_bytes != min_sib_bytes);
+        bool repetition_too_low = mldsa_native_repetitions < min_repetitions;
+        if(repetition_too_low | exact_repetition_mismatch | exact_sib_bytes_mismatch){
+          if(0==(i%(1024*1024))){
+            printf("\r%10lu",i);
+            fflush(stdout);
+          }
+        }else{
           reported_cnt++;
           uint32_t n_aborts_z=causes[0];
           uint32_t n_aborts_r=causes[1];
@@ -392,22 +448,11 @@ int main(int argc, const char*argv[]){
           sum_t0 += n_aborts_t0;
           sum_h += n_aborts_h;
           if(log_aborts){
-            //uint64_t msg64;
-            //memcpy(&msg64,message,sizeof msg64);
-            //printf("\r%10lu, %2u, %2u, %2u, %2u, %2u, %5lu, %5lu, 0x%016lx\n",idx,mldsa_native_repetitions,n_aborts_z,n_aborts_r, n_aborts_t0,n_aborts_h,sum_z,sum_r,msg64);
-            printf("\r%10lu, %2u, %2u, %2u, %2u, %2u, %5lu, %5lu\n",idx,mldsa_native_repetitions,n_aborts_z,n_aborts_r, n_aborts_t0,n_aborts_h,sum_z,sum_r);
+            printf("\r%10lu, %2u, %2u, %2u, %2u, %2u, %5lu, %5lu, %2u, %2u\n",idx,mldsa_native_repetitions,n_aborts_z,n_aborts_r, n_aborts_t0,n_aborts_h,sum_z,sum_r, sib_blocks, sib_bytes);
           }else{
             printf("\r%10lu,%2u\n",idx,mldsa_native_repetitions);
           }
-          if(only1) break;
-          //if(min_repetitions>1){
-          //  min_repetitions = mldsa_native_repetitions + 1;
-          //}
-        }else{
-          if(0==(i%(1024*1024))){
-            printf("\r%10lu",i);
-            fflush(stdout);
-          }
+          if(stop_at==reported_cnt) break;
         }
       }
     } else {
