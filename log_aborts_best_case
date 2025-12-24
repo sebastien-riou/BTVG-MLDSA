@@ -3,5 +3,5 @@
 set -ex
 
 PSET=$1
-HDRBG_SEED=$2
+HDRBG_SEED=${2-00}
 ./log_aborts mldsa$PSET 69 $HDRBG_SEED best ${@: 3} --stop-at=100 --exact-repetitions --min-repetitions=1 --exact-sib-bytes
