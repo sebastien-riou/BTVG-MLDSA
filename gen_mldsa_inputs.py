@@ -106,6 +106,7 @@ def format_as_c(params, *,expand_msg=False):
     message_size = len(messages[0])
     m_size = min(8,message_size)
     p(f"typedef struct {base_type_name}_struct {{")
+    p(f'\tconst char* name;')
     p(f'\tunsigned int mldsa_pset;')
     p(f'\tuint8_t hdrbg_seed[8];')
     p(f'\tuint8_t mldsa_seed[32];')
@@ -124,6 +125,7 @@ def format_as_c(params, *,expand_msg=False):
 
     #value declaration
     p(f"const {base_type_name}_t {base_type_name} = {{")
+    p(f'.name = "{gen_tv_name(params)}",')
     p(f".mldsa_pset = {params['mldsa_pset']},")
     print_param_as_c_byte_array('hdrbg_seed')
     print_param_as_c_byte_array('mldsa_seed')
@@ -248,6 +250,9 @@ def format_as_sv(params, *,expand_msg=False):
     print_param_as_sv_array64('sigs_sha256_digest')
     return out.getvalue()
 
+def gen_tv_name(params):
+    base_name = f"mldsa{params['mldsa_pset']}-m{size_str(params['msg_size'])}-h{Utils.hexstr(params['sigs_sha256_digest'][:4],separator='')}"
+    return base_name
 
 if __name__ == '__main__':
     scriptname = os.path.basename(__file__)
@@ -287,7 +292,8 @@ if __name__ == '__main__':
         out.append(['sv',format_as_sv(params,expand_msg=args.expand_msg)])
     
 
-    base_name = f"mldsa{params['mldsa_pset']}-m{size_str(params['msg_size'])}-h{Utils.hexstr(params['sigs_sha256_digest'][:4],separator='')}"
+    #base_name = f"mldsa{params['mldsa_pset']}-m{size_str(params['msg_size'])}-h{Utils.hexstr(params['sigs_sha256_digest'][:4],separator='')}"
+    base_name = gen_tv_name(params)
     base_name = os.path.join(args.write,base_name)
     for o in out:
         with open(base_name+'.'+o[0],'w') as f:
