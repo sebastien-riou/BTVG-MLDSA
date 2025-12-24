@@ -82,7 +82,6 @@ def data_to_py(data,*, dst_dir=None):
 
     digest = hashlib.sha256(sigs).digest()
     base_name = f"mldsa{data['mldsa pset']}-m{gen_mldsa_inputs.size_str(data['msg size'])}-h{Utils.hexstr(digest[:4],separator='')}"
-    print(f'dst_dir={dst_dir}')
     if dst_dir:
         base_name = os.path.join(dst_dir,base_name)
     out_file = base_name+'.py'
@@ -129,12 +128,10 @@ def write_params(dst,params):
 def log_to_py(src_path,*, dst_dir=None):
     import parse_aborts
     data = parse_aborts.parse_aborts(src_path)
-    print(f'dst_dir={dst_dir}')
     data_to_py(data, dst_dir=dst_dir)
 
 if __name__ == '__main__':
     dst_dir = None
     if len(sys.argv)>2:
         dst_dir = sys.argv[2]
-        print(f'dst_dir={dst_dir}')
     log_to_py(sys.argv[1],dst_dir=dst_dir)
