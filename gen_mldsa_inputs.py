@@ -113,6 +113,7 @@ def format_as_c(params, *,expand_msg=False):
     p(f"\tuint8_t pk[{len(params['pk'])}];")
     p(f'\tunsigned int nmessages;')
     p(f"\tunsigned int repetitions[{nmessages}];")
+    p(f"\tunsigned int sib_bytes[{nmessages}];")
     p(f'\tunsigned int message_size;')
     p(f"\tuint8_t sign_messages[{nmessages}][{m_size}];")
     p(f'\tunsigned int internal_message_size;')
@@ -131,6 +132,7 @@ def format_as_c(params, *,expand_msg=False):
 
     p(f".nmessages = {nmessages},")
     print_param_as_c_ui_array('repetitions')
+    print_param_as_c_ui_array('sib_bytes')
     
     p(f'.message_size = {message_size},')
     mprime_size = message_size+2
@@ -257,7 +259,7 @@ if __name__ == '__main__':
     formats = ('C', 'SV', 'ALL')
     parser.add_argument('format', default='C', choices=formats, help='output format')
     parser.add_argument('--expand-msg', help='Fully expand message input', action='store_true')
-    parser.add_argument('--write', help='Write output to file(s)', action='store_true')
+    parser.add_argument('--write', default='', help='Path to write result files', type=str)
 
     args = parser.parse_args()
     logformat = '%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s'
@@ -284,12 +286,9 @@ if __name__ == '__main__':
     if gen_sv:
         out.append(['sv',format_as_sv(params,expand_msg=args.expand_msg)])
     
-    if args.write:
-        base_name = f"mldsa{params['mldsa_pset']}-m{size_str(params['msg_size'])}-h{Utils.hexstr(params['sigs_sha256_digest'][:4],separator='')}"
-        for o in out:
-            with open(base_name+'.'+o[0],'w') as f:
-                print(o[1],file=f)
-    else:
-        for o in out:
-            print(f'output "{o[0]}":')
-            print(o[1])
+
+    base_name = f"mldsa{params['mldsa_pset']}-m{size_str(params['msg_size'])}-h{Utils.hexstr(params['sigs_sha256_digest'][:4],separator='')}"
+    base_name = os.path.join(args.write,base_name)
+    for o in out:
+        with open(base_name+'.'+o[0],'w') as f:
+            print(o[1],file=f)
