@@ -6,4 +6,4 @@ PSET=$1
 HDRBG_SEED=$2
 ./log_aborts mldsa$PSET 69  $HDRBG_SEED short ${@: 3}
 ./log_aborts_long_msg_sizes $PSET $HDRBG_SEED ${@: 3}
-./log_aborts_best_case $PSET $HDRBG_SEED ${@: 3}
+# ./log_aborts_best_case $PSET $HDRBG_SEED ${@: 3}
