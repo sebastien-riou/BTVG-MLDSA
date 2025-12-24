@@ -6,6 +6,7 @@ import copy
 import logging
 import io
 from pysatl import Utils
+import math
 
 import gen_mldsa_inputs
 from dilithium_py.src.dilithium_py.ml_dsa import default_parameters
@@ -70,15 +71,46 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
         message[0:hbound] = drbg_msg_tmp.get_bytes(hbound,additional_input=idx.to_bytes(8,byteorder='little')) 
 
         sig = dut.sign(sk=sk,m=message,ctx=bytes(0),deterministic=True)
-        logging.debug(f'{idx:5} {dut.nr_sign_iterations:3} {dut.check_z_fail:2} {dut.check_r_fail:2} {dut.check_t0_fail:2} {dut.check_h_fail:2} {Utils.hexstr(message[0:8])}')
-        return {'sig':sig, 'repetitions':dut.nr_sign_iterations}
+        logging.debug(f'{idx:5} {dut.nr_sign_iterations:3} {dut.check_z_fail:2} {dut.check_r_fail:2} {dut.check_t0_fail:2} {dut.check_h_fail:2} sip:{dut.sib_bytes_cnt:2} - {Utils.hexstr(message[0:8])}')
+        return {'sig':sig, 'repetitions':dut.nr_sign_iterations, 'sib_bytes':dut.sib_bytes_cnt}
+
+    best_case = None
+    if not only1:
+        #identify a best case
+        logging.info(f"Check that best case for mldsa{data['mldsa pset']} is present in data set")
+        best_case = None
+        start=0
+        while True:
+            try:
+                idx = data['repetitions'].index(1,start)
+            except ValueError:
+                break
+            iteration = data['iterations'][idx]
+            idx_data = index_to_data(iteration)
+            if dut.tau == idx_data['sib_bytes']:
+                best_case = iteration
+                logging.info(f"Best case for mldsa{data['mldsa pset']} is present in data set")
+                # move it as first data to ensure it is included
+                data['iterations'].insert(0, data['iterations'].pop(idx))
+                data['repetitions'].insert(0, data['repetitions'].pop(idx))
+                break
+            start = idx + 1
         
-    if (len(data['repetitions'])<300 and not only1):
-        # we have only one test vector, generate additional test vectors
-        for i in range(0,300):
-            idx_data = index_to_data(i)
-            data['iterations'].append(i)
-            data['repetitions'].append(idx_data['repetitions'])
+        if best_case is None:
+            # search best case
+            logging.info(f"Best case for mldsa{data['mldsa pset']} is NOT present in data set")
+            logging.info(f"Search for best case for mldsa{data['mldsa pset']}")
+            iteration = max(data['iterations']) + 1
+            while True:
+                idx_data = index_to_data(iteration)
+                if (1 == idx_data['repetitions']) and (dut.tau == idx_data['sib_bytes']):
+                    best_case = iteration
+                    # insert the best case as first data to ensure it is included
+                    data['iterations'].insert(0,iteration)
+                    data['repetitions'].insert(0,idx_data['repetitions'])
+                    logging.info(f"Best case for mldsa{data['mldsa pset']} added to data set")
+                    break
+                iteration += 1
 
     max_loops = max(data['repetitions'])
     min_loops = min(data['repetitions'])
@@ -87,9 +119,16 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
 
     if min_loops > 1:
         raise RuntimeError("the data set does not contain the minimal number of repetition")
+    if not only1:
+        logging.info(f"Best case for mldsa{data['mldsa pset']} at iteration {best_case}")
 
     src = dict(zip(data['iterations'],data['repetitions']))
+    def key_for(value, *,start=0):
+        """find key associated with value in scr"""
+        return list(src.keys())[list(src.values()).index(value, start)]
+
     logging.debug(src)
+    logging.debug(f'{len(src)} cases in data set')
 
     selected = dict()
     selected_sum = 0
@@ -100,6 +139,8 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
     def take_at(index):
         nonlocal selected_ave, selected_sum, selected, src, too_low, too_high
         v = src.pop(index)
+        if index in selected:
+            raise RuntimeError()
         selected[index] = v
         selected_sum += v 
         selected_ave = selected_sum / len(selected)
@@ -110,9 +151,22 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
             too_high = True
         if selected_ave <= target_average-threshold:
             too_low = True
+        logging.debug(f'{len(selected)}, sum={selected_sum}, ave={selected_ave}')
 
-    def key_for(value):
-        return list(src.keys())[list(src.values()).index(value)]
+    last_iteration = max(data['iterations'])
+    def add_specific_repetition(target: int):
+        nonlocal src, last_iteration
+        logging.debug(f'Searching for repetitions = {target}')
+        iteration = last_iteration + 1
+        while True:
+            idx_data = index_to_data(iteration)
+            if target == idx_data['repetitions']:
+                src[iteration] = idx_data['repetitions']
+                break
+            iteration += 1
+        last_iteration = iteration
+        logging.debug(f'Adding iteration = {iteration}, repetition = {src[iteration]}')
+        return iteration
 
     take_at(key_for(1))
 
@@ -126,7 +180,7 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
                     ideal = 1
                 if too_low:
                     for k,v in src.items():
-                        if v >= ideal and v < 2*ideal:
+                        if v >= ideal and v < ideal+1:
                             index = k
                             break
                     for k,v in src.items():
@@ -147,9 +201,19 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
                             index = k
                             break
                 if index is None:
-                    raise RuntimeError('Target average not achievable')
-                #print(ideal, v)
+                    #generate the ideal value
+                    if too_low:
+                        v = math.ceil(ideal)
+                    else:
+                        v = math.floor(ideal)
+                    index = add_specific_repetition(v)
+                    #logging.error(f"selected: {selected}")
+                    #logging.error(f"left in src: {src}")
+                    #raise RuntimeError('Target average not achievable')
+                
                 take_at(index)
+                logging.debug(f'ideal={ideal}, actual={v}')
+                
 
         selection()
 
@@ -160,6 +224,8 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
     indexes = list(selected.keys())
     indexes.sort()
     logging.debug(str(indexes))
+    logging.debug(f"Number of selected messages: {len(indexes)}")
+    
 
     i=0
     tv=0
@@ -168,14 +234,22 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
     repetitions_min = 814
     repetitions_max = 0
     repetitions = []
+    sib_bytes = []
+    best_case = None
     for idx in indexes:
         idx_data = index_to_data(idx)
         sigs += idx_data['sig']
-        repetitions.append(idx_data['repetitions'])
-        repetitions_sum += idx_data['repetitions']
-        repetitions_min = min(repetitions_min,idx_data['repetitions'])
-        repetitions_max = max(repetitions_max,idx_data['repetitions'])
+        rep = idx_data['repetitions']
+        repetitions.append(rep)
+        sib_bytes.append(idx_data['sib_bytes'])
+        if 1 == idx_data['repetitions']:
+            if dut.tau == idx_data['sib_bytes']:
+                best_case = idx
+        repetitions_sum += rep
+        repetitions_min = min(repetitions_min,rep)
+        repetitions_max = max(repetitions_max,rep)
         tv += 1
+        logging.debug(f'{tv}, {idx}, {rep} added: sum = {repetitions_sum}, ave = {repetitions_sum/tv}')
 
     if repetitions_min != 1:
         raise RuntimeError(f'repetition_min = {repetitions_min}, 1 expected')
@@ -187,6 +261,8 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
         repetitions_ave = repetitions_sum/len(indexes)
         if selected_ave != repetitions_ave:
             raise RuntimeError(f'repetitions_ave = {repetitions_ave}, {selected_ave} expected')
+        if best_case is None:
+            raise RuntimeError(f'Best case not in the selection')
 
     digest = hashlib.sha256(sigs).digest()
     base_name = f"mldsa{data['mldsa pset']}-m{gen_mldsa_inputs.size_str(data['msg size'])}-h{Utils.hexstr(digest[:4],separator='')}"
@@ -206,6 +282,7 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
     params['average'] = selected_ave
     params['max_repetitions'] = max_loops
     params['sigs_sha256_digest'] = digest
+    params['sib_bytes'] = sib_bytes
     write_params(out_file,params)
     return out_file
 
@@ -225,6 +302,7 @@ def params_to_str(params):
     p(f'average = {params['average']}')
     p(f'max_repetitions = {params['max_repetitions']}')
     p(f'sigs_sha256_digest = {params['sigs_sha256_digest']}')
+    p(f'sib_bytes = {params['sib_bytes']}')
     return out.getvalue()
 
 def write_params(dst,params):
