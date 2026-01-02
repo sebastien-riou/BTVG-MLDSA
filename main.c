@@ -96,6 +96,9 @@ extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_blocks;
 extern uint32_t PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_bytes;
 extern uint32_t PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_bytes;
 extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_bytes;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_hbp_index;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_hbp_index;
+extern uint32_t PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_hbp_index;
 
 void randombytes(uint8_t *buf, size_t n){
   memset(buf,0,n);//we want deterministic mode, not hedged mode.
@@ -146,7 +149,7 @@ int main(int argc, const char*argv[]){
     unsigned int stop_at = 0;
     unsigned int min_sib_bytes = 0;
     unsigned int exact_sib_bytes = 0;
-    
+    unsigned int target_hbp_index = 0;//0 means no filtering
 /*
     {
       uint8_t entropy[32] = {0};
@@ -230,6 +233,12 @@ int main(int argc, const char*argv[]){
       const char*exact_sib_bytes_str = "--exact-sib-bytes";
       if(0==memcmp(argv[i],exact_sib_bytes_str,strlen(exact_sib_bytes_str))){
         exact_sib_bytes = 1;
+        continue;
+      }
+      const char*hbp_index_str = "--hbp-index=";
+      if(0==memcmp(argv[i],hbp_index_str,strlen(hbp_index_str))){
+        const char*hbp_index_val_str = argv[i]+strlen(hbp_index_str);
+        target_hbp_index = strtoull(hbp_index_val_str,0,0);
         continue;
       }
       const char*stop_at_str = "--stop-at=";
@@ -320,6 +329,9 @@ int main(int argc, const char*argv[]){
     uint64_t reported_cnt=0;
     uint64_t trials_cnt=0;
     uint32_t max_repetitions=0;
+    uint32_t min_hbp_index =-1;
+    uint32_t max_hbp_index = 0;
+    uint32_t sum_hbp_index = 0;
     if(0 == (err_code = setjmp(main_exception_ctx))){
       uint8_t entropy[32] = {0};
       const uint8_t nonce[32] = {0};
@@ -372,6 +384,7 @@ int main(int argc, const char*argv[]){
         uint32_t*causes=0;
         uint32_t sib_blocks;
         uint32_t sib_bytes;
+        uint32_t hbp_index;
         switch(mldsa_pset){
           case 44: if(mldsa44_signature(sig,&sigsize,message, message_size, 0, 0, sk)){
               throw_exception(__LINE__);
@@ -380,6 +393,7 @@ int main(int argc, const char*argv[]){
             causes = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_repetitions_causes;
             sib_blocks = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_blocks;
             sib_bytes = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_sib_bytes;
+            hbp_index = PQCP_MLDSA_NATIVE_MLDSA44_mldsa_native_hbp_index;
             break;
           case 65: if(mldsa65_signature(sig,&sigsize,message, message_size, 0, 0, sk)){
               throw_exception(__LINE__);
@@ -388,6 +402,7 @@ int main(int argc, const char*argv[]){
             causes = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_repetitions_causes;
             sib_blocks = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_blocks;
             sib_bytes = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_sib_bytes;
+            hbp_index = PQCP_MLDSA_NATIVE_MLDSA65_mldsa_native_hbp_index;
             break;
           case 87: if(mldsa87_signature(sig,&sigsize,message, message_size, 0, 0, sk)){
               throw_exception(__LINE__);
@@ -396,6 +411,7 @@ int main(int argc, const char*argv[]){
             causes = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_repetitions_causes;
             sib_blocks = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_blocks;
             sib_bytes = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_sib_bytes;
+            hbp_index = PQCP_MLDSA_NATIVE_MLDSA87_mldsa_native_hbp_index;
             break;
           default:
             throw_exception(__LINE__);
@@ -428,10 +444,11 @@ int main(int argc, const char*argv[]){
         total_sum_t0+= causes[2];
         total_sum_h += causes[3];
         //printf("repetitions = %u\n",mldsa_native_repetitions);
-        bool exact_repetition_mismatch = exact_repetitions && (mldsa_native_repetitions != min_repetitions);
-        bool exact_sib_bytes_mismatch = exact_sib_bytes && (sib_bytes != min_sib_bytes);
-        bool repetition_too_low = mldsa_native_repetitions < min_repetitions;
-        if(repetition_too_low | exact_repetition_mismatch | exact_sib_bytes_mismatch){
+        const bool exact_repetition_mismatch = exact_repetitions && (mldsa_native_repetitions != min_repetitions);
+        const bool exact_sib_bytes_mismatch = exact_sib_bytes && (sib_bytes != min_sib_bytes);
+        const bool repetition_too_low = mldsa_native_repetitions < min_repetitions;
+        const bool hbp_index_mismatch = target_hbp_index ? target_hbp_index != hbp_index : 0;
+        if(repetition_too_low | exact_repetition_mismatch | exact_sib_bytes_mismatch | hbp_index_mismatch){
           if(0==(i%(1024*1024))){
             printf("\r%10lu",i);
             fflush(stdout);
@@ -447,8 +464,11 @@ int main(int argc, const char*argv[]){
           sum_r += n_aborts_r;
           sum_t0 += n_aborts_t0;
           sum_h += n_aborts_h;
+          sum_hbp_index += hbp_index;
+          if(hbp_index < min_hbp_index) min_hbp_index = hbp_index;
+          if(hbp_index > max_hbp_index) max_hbp_index = hbp_index;
           if(log_aborts){
-            printf("\r%10lu, %2u, %2u, %2u, %2u, %2u, %5lu, %5lu, %2u, %2u\n",idx,mldsa_native_repetitions,n_aborts_z,n_aborts_r, n_aborts_t0,n_aborts_h,sum_z,sum_r, sib_blocks, sib_bytes);
+            printf("\r%10lu, %2u, %2u, %2u, %2u, %2u, %5lu, %5lu, %2u, %2u, %2u\n",idx,mldsa_native_repetitions,n_aborts_z,n_aborts_r, n_aborts_t0,n_aborts_h,sum_z,sum_r, sib_blocks, sib_bytes, hbp_index);
           }else{
             printf("\r%10lu,%2u\n",idx,mldsa_native_repetitions);
           }
@@ -462,10 +482,15 @@ int main(int argc, const char*argv[]){
     if(message){
       free(message);
     }
+    double ave_hbp_index = ((double)sum_hbp_index) / reported_cnt;
     printf("\n");
     printf("Stats over the %lu reported cases:\n", reported_cnt);
     printf("\tSums: repetitions=%lu, z=%lu, r=%lu, t0=%lu, h=%lu\n", sum_rep,sum_z, sum_r, sum_t0, sum_h);
     printf("\tAverages: repetitions=%f, z=%f, r=%f, t0=%f, h=%f\n",((double)sum_rep)/reported_cnt,((double)sum_z)/reported_cnt, ((double)sum_r)/reported_cnt, ((double)sum_t0)/reported_cnt, ((double)sum_h)/reported_cnt);
+    printf("\tHBP index:\n");
+    printf("\t\tmin = %u\n",min_hbp_index);
+    printf("\t\tave = %f\n",ave_hbp_index);
+    printf("\t\tmax = %u\n",max_hbp_index);
     printf("Stats over all %lu trials:\n", trials_cnt);
     printf("\tSums: repetitions=%lu, z=%lu, r=%lu, t0=%lu, h=%lu\n", total_sum_rep,total_sum_z, total_sum_r, total_sum_t0, total_sum_h);
     printf("\tAverages: repetitions=%f, z=%f, r=%f, t0=%f, h=%f\n",((double)total_sum_rep)/trials_cnt,((double)total_sum_z)/trials_cnt, ((double)total_sum_r)/trials_cnt, ((double)total_sum_t0)/trials_cnt, ((double)total_sum_h)/trials_cnt);

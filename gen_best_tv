@@ -1,0 +1,8 @@
+#!/bin/bash
+
+#./log_aborts_best_case 44 00
+PSET=44
+HDRBG_SEED=00
+./log_aborts mldsa$PSET 69 $HDRBG_SEED best ${@: 3} --stop-at=5 --exact-repetitions --min-repetitions=1 --exact-sib-bytes --hbp-index=64
+pipenv run python ./log_to_py.py ./results/best-mldsa${PSET}-m69-s00.log ./results
+pipenv run python ./gen_mldsa_inputs.py ./results/mldsa${PSET}-m69-*.py ALL --write=./results
