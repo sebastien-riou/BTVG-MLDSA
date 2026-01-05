@@ -36,15 +36,7 @@ size of log files.
 See `example.py`
 
 ### C
-
-````
-#include <stdint.h>
-#include "results/mldsa44-m69-h30D1C064.c"
-
-void gen_message(unsigned int index, uint8_t*dst, size_t dst_size){
-TODO
-}
-````
+See [MLDSA-benchmark](https://github.com/sebastien-riou/MLDSA-benchmark/blob/main/libmldsa-lbmk/source/core.c)
 
 ### System verilog
 
