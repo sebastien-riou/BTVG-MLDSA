@@ -131,6 +131,28 @@ jmp_buf*set_exception_ctx(jmp_buf*new_exception_ctx){
 void throw_exception(uint32_t err_code){
   longjmp(*exception_ctx,err_code);
 }
+
+uint64_t get_u64(const char*val_str, uint64_t k){
+  char*end;
+  uint64_t out = strtoull(val_str,&end,0);
+  size_t factor=1;
+  if(*end=='K' || *end=='k') factor = k;
+  if(*end=='M' || *end=='m') factor = k*k;
+  if(*end=='G' || *end=='g') factor = k*k*k;
+  out *= factor;
+  return out;
+}
+uint64_t get_u64_k(const char*val_str){
+  return get_u64(val_str,1000);
+}
+uint64_t get_u64_kb(const char*val_str){
+  return get_u64(val_str,1024);
+}
+void flush_abort(){
+  fflush(stdout);
+  fflush(stderr);
+  abort();
+}
 #define MLDSA44 1
 #define MLDSA65 2
 #define MLDSA87 4
@@ -144,9 +166,10 @@ int main(int argc, const char*argv[]){
     unsigned int log_aborts = 1;
     unsigned int verify = 0;
     uint64_t ntrials = 1000*1000;
+    bool ntrials_set = 0;
     unsigned int min_repetitions = 1;
     unsigned int exact_repetitions = 0;
-    unsigned int stop_at = 0;
+    uint64_t stop_at = 0;
     unsigned int min_sib_bytes = 0;
     unsigned int exact_sib_bytes = 0;
     unsigned int target_hbp_index = 0;//0 means no filtering
@@ -191,26 +214,13 @@ int main(int argc, const char*argv[]){
       }
       const char*msgsize_str = "--msg-size=";
       if(0==memcmp(argv[i],msgsize_str,strlen(msgsize_str))){
-        const char*msgsize_val_str = argv[i]+strlen(msgsize_str);
-        char*end;
-        message_size = strtoull(msgsize_val_str,&end,0);
-        size_t factor=1;
-        if(*end=='K' || *end=='k') factor = 1024;
-        if(*end=='M' || *end=='m') factor = 1024*1024;
-        if(*end=='G' || *end=='g') factor = 1024*1024*1024;
-        message_size *= factor;
+        message_size = get_u64_kb(argv[i]+strlen(msgsize_str));
         continue;
       }
       const char*ntrials_str = "--n-trials=";
       if(0==memcmp(argv[i],ntrials_str,strlen(ntrials_str))){
-        const char*ntrials_val_str = argv[i]+strlen(ntrials_str);
-        char*end;
-        ntrials = strtoull(ntrials_val_str,&end,0);
-        size_t factor=1;
-        if(*end=='K' || *end=='k') factor = 1024;
-        if(*end=='M' || *end=='m') factor = 1024*1024;
-        if(*end=='G' || *end=='g') factor = 1024*1024*1024;
-        ntrials *= factor;
+        ntrials = get_u64_k(argv[i]+strlen(ntrials_str));
+        ntrials_set=1;
         continue;
       }
       const char*min_repetitions_str = "--min-repetitions=";
@@ -243,8 +253,7 @@ int main(int argc, const char*argv[]){
       }
       const char*stop_at_str = "--stop-at=";
       if(0==memcmp(argv[i],stop_at_str,strlen(stop_at_str))){
-        const char*stop_at_val_str = argv[i]+strlen(stop_at_str);
-        stop_at = strtoull(stop_at_val_str,0,0);
+        stop_at = get_u64_k(argv[i]+strlen(stop_at_str));
         continue;
       }
       const char*mldsa44_str = "mldsa44";
@@ -267,8 +276,18 @@ int main(int argc, const char*argv[]){
         verify = 1;
         continue;
       }
-      printf("ERROR unsupported command line argument: '%s'\n",argv[i]);
-      abort();
+      fprintf(stderr,"ERROR unsupported command line argument: '%s'\n",argv[i]);
+      flush_abort();
+    }
+    if(stop_at){
+      if(ntrials_set){
+        if(ntrials<stop_at){
+          fprintf(stderr,"ERROR ntrials<stop_at: '%lu' vs '%lu'\n",ntrials,stop_at);
+          flush_abort();
+        }
+      }else{
+        ntrials = -1;
+      }
     }
     const uint32_t pset = (mldsa87<<2)|(mldsa65<<1)|mldsa44;
     size_t sksize,pksize,sigsize;
@@ -305,18 +324,18 @@ int main(int argc, const char*argv[]){
       min_sib_bytes = tau;
     }else{
       if( (!exact_repetitions) || (min_repetitions>1)){
-        printf("ERROR unconsistent command line: --min-sib-bytes requires --exact-repetitions --min-repetitions=1.\n");
-        abort();
+        fprintf(stderr,"ERROR unconsistent command line: --min-sib-bytes requires --exact-repetitions --min-repetitions=1.\n");
+        flush_abort();
       }
     }
     if(exact_sib_bytes){
       if( (!exact_repetitions) || (min_repetitions>1)){
-        printf("ERROR unconsistent command line: --exact-sib-bytes requires --exact-repetitions --min-repetitions=1.\n");
-        abort();
+        fprintf(stderr,"ERROR unconsistent command line: --exact-sib-bytes requires --exact-repetitions --min-repetitions=1.\n");
+        flush_abort();
       }
       if(min_sib_bytes<tau){
-        printf("ERROR unconsistent command line: --min-sib-bytes=%u but tau=%u.\n",min_sib_bytes,tau);
-        abort();
+        fprintf(stderr,"ERROR unconsistent command line: --min-sib-bytes=%u but tau=%u.\n",min_sib_bytes,tau);
+        flush_abort();
       }
     }
     uint32_t err_code=0;
@@ -478,6 +497,8 @@ int main(int argc, const char*argv[]){
     } else {
       //exception
       printf("EXCEPTION: %u (0x%x)\n",err_code,err_code);
+      fprintf(stderr,"EXCEPTION: %u (0x%x)\n",err_code,err_code);
+      flush_abort();
     } 
     if(message){
       free(message);
