@@ -350,7 +350,10 @@ int main(int argc, const char*argv[]){
     uint32_t max_repetitions=0;
     uint32_t min_hbp_index =-1;
     uint32_t max_hbp_index = 0;
-    uint32_t sum_hbp_index = 0;
+    uint32_t total_min_hbp_index =-1;
+    uint32_t total_max_hbp_index = 0;
+    uint64_t sum_hbp_index = 0;
+    uint64_t total_sum_hbp_index = 0;
     if(0 == (err_code = setjmp(main_exception_ctx))){
       uint8_t entropy[32] = {0};
       const uint8_t nonce[32] = {0};
@@ -462,6 +465,13 @@ int main(int argc, const char*argv[]){
         total_sum_r += causes[1];
         total_sum_t0+= causes[2];
         total_sum_h += causes[3];
+        total_sum_hbp_index += hbp_index;
+        if(hbp_index < total_min_hbp_index) {
+          total_min_hbp_index = hbp_index;
+          printf("\nINFO: new total_min_hbp_index = %u (repetitions = %u, sib_bytes = %u)\n",total_min_hbp_index,mldsa_native_repetitions,sib_bytes);
+          fflush(stdout);
+        }
+        if(hbp_index > total_max_hbp_index) total_max_hbp_index = hbp_index;
         //printf("repetitions = %u\n",mldsa_native_repetitions);
         const bool exact_repetition_mismatch = exact_repetitions && (mldsa_native_repetitions != min_repetitions);
         const bool exact_sib_bytes_mismatch = exact_sib_bytes && (sib_bytes != min_sib_bytes);
@@ -504,6 +514,7 @@ int main(int argc, const char*argv[]){
       free(message);
     }
     double ave_hbp_index = ((double)sum_hbp_index) / reported_cnt;
+    double total_ave_hbp_index = ((double)total_sum_hbp_index) / trials_cnt;
     printf("\n");
     printf("Stats over the %lu reported cases:\n", reported_cnt);
     printf("\tSums: repetitions=%lu, z=%lu, r=%lu, t0=%lu, h=%lu\n", sum_rep,sum_z, sum_r, sum_t0, sum_h);
@@ -516,6 +527,10 @@ int main(int argc, const char*argv[]){
     printf("\tSums: repetitions=%lu, z=%lu, r=%lu, t0=%lu, h=%lu\n", total_sum_rep,total_sum_z, total_sum_r, total_sum_t0, total_sum_h);
     printf("\tAverages: repetitions=%f, z=%f, r=%f, t0=%f, h=%f\n",((double)total_sum_rep)/trials_cnt,((double)total_sum_z)/trials_cnt, ((double)total_sum_r)/trials_cnt, ((double)total_sum_t0)/trials_cnt, ((double)total_sum_h)/trials_cnt);
     printf("\tMaximum repetitions: %u\n",max_repetitions);
+    printf("\tHBP index:\n");
+    printf("\t\tmin = %u\n",total_min_hbp_index);
+    printf("\t\tave = %f\n",total_ave_hbp_index);
+    printf("\t\tmax = %u\n",total_max_hbp_index);
     printf("done.\n");
     return 0;
 }
