@@ -13,14 +13,17 @@ import glob
 mlen = sys.argv[1]
 base_dir = sys.argv[2]
 
-with open(os.path.join(base_dir,'mldsa_test_vectors_as_dict.py'),'w') as f:
+with open(os.path.join(base_dir,f'mldsa-m{mlen}-as-dict.py'),'w') as f:
     MLDSA_KATs = {}
+    print(f'# MLDSA test vectors for message length = {mlen}, context length = 0',file=f)
+    print(f'# Generated from the following files:',file=f)
 
     pattern = os.path.join(base_dir,f'mldsa*-m{mlen}-*.sel.py')
     print('search pattern:',pattern)
     sel_files = glob.glob(pattern)
     for sel in sel_files:
         print(f'Processing {sel}')
+        print(f'# \t{os.path.basename(sel)}',file=f)
         # Get the parameters
         params = runpy.run_path(sel) 
         pset = params['mldsa_pset']
@@ -51,4 +54,5 @@ with open(os.path.join(base_dir,'mldsa_test_vectors_as_dict.py'),'w') as f:
         MLDSA_KATs[f'MLDSA_{pset}'] = out
         MLDSA_KATs['sign_seed'] = bytes(32) #MLDSA deterministic mode
 
+    
     print(f'MLDSA_KATs = {MLDSA_KATs}',file=f)
