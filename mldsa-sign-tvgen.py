@@ -308,6 +308,7 @@ if __name__ == '__main__':
         out=[]
         out.append(['c',gen_mldsa_inputs.format_as_c(params)])
         out.append(['sv',gen_mldsa_inputs.format_as_sv(params)])
+        out.append(['json',gen_mldsa_inputs.format_as_acvp_json(params)])
         out.append(['sel.py',mldsa_select.params_to_str(params)])
         
         key = f"mldsa{params['mldsa_pset']}-m{gen_mldsa_inputs.size_str(params['msg_size'])}"

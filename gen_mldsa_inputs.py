@@ -211,9 +211,11 @@ def format_as_acvp_json(params, version=None):
     signatures = gen_mldsa_outputs(params)
     testGroup = {}
     testGroup["type"] = "MlDsaSign"
+    testGroup["parameterSet"] = f"ML-DSA-{params['mldsa_pset']}"
     testGroup["privateSeed"] = Utils.hexstr(params['mldsa_seed'],separator='')
     #testGroup["privateKeyPkcs8"] = ?
     #testGroup["publicKey"] = Utils.hexstr(pk,separator='')
+    testGroup["deterministic"] = "true"
     source = {"name": "https://github.com/sebastien-riou/BTVG-MLDSA" }
     if version:
         source["version"] = version
@@ -231,7 +233,8 @@ def format_as_acvp_json(params, version=None):
     testGroups = []
     testGroups.append(testGroup)
     top = {}
-    top["algorithm"] = f"ML-DSA-{params['mldsa_pset']}"
+    top["algorithm"] = f"ML-DSA"
+    top["mode"] = f"sigGen"
     top["numberOfTests"] = len(messages)
     top["schema"] = "mldsa_sign_seed_schema.json"
     top["testGroups"] = testGroups
