@@ -5,13 +5,11 @@ from gen_mldsa_inputs import gen_mldsa_inputs
 from dilithium_py.src.dilithium_py.ml_dsa.default_parameters import ML_DSA_44
 
 # Get the parameters
-params = runpy.run_path('results/mldsa44-m69-h12FA23B2.sel.py') # TODO: Replace the file by the real test vector
+params = runpy.run_path('example.sel.py') # TODO: Replace the file by the real test vector
 
 # Generate the inputs
-messages, mprimes, mus = gen_mldsa_inputs(params)
+messages, mprimes, mus, pk, sk = gen_mldsa_inputs(params)
 sigs = bytearray()
-
-pk, sk = ML_DSA_44.key_derive(seed=params['mldsa_seed'])
 
 # Process the inputs, here for pure ML-DSA.Sign
 for message in messages:
