@@ -9,23 +9,7 @@ import io
 import copy
 
 
-from gen_mldsa_inputs import gen_mldsa_inputs,size_str
-from mldsa_select import get_mldsa_impl
-
-# A functions to generate all inputs from the parameters
-def gen_mldsa_outputs(params):
-    messages, _mprimes, _mus = gen_mldsa_inputs(params)
-    impl = get_mldsa_impl(params['mldsa_pset'])
-    entropy = params['hdrbg_seed']+bytes(24)
-    logging.debug(f'entropy: {Utils.hexstr(entropy)}')
-    drbg = hdrbg.DRBG_SHA2_256(entropy=entropy,nonce=bytes(32))
-    zeta = bytearray()
-    zeta += drbg.get_bytes(32)
-    _pk, sk = impl.key_derive(seed=zeta)
-    signatures = []
-    for m in messages:
-        signatures.append(impl.sign(sk=sk,m=m,ctx=bytes(0),deterministic=True))
-    return signatures
+from mldsa_utils import gen_mldsa_outputs, size_str
 
 if __name__ == '__main__':
     scriptname = os.path.basename(__file__)

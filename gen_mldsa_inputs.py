@@ -7,57 +7,9 @@ import argparse
 import logging
 import io
 import copy
+import json
 
-def size_str(size):
-    for u in [['G',1024*1024*1024],['M',1024*1024],['K',1024]]:
-        divider = u[1]
-        if 0 == size % divider:
-            return f'{size // divider}{u[0]}'
-    return f'{size}'
-
-# A functions to generate all inputs from the parameters
-def gen_mldsa_inputs(params):
-    if params['ctx_size'] > 0:
-        raise RuntimeError('Not implemented')
-
-    msg_size = params['msg_size']
-
-    #seed DRBG
-    drbg = hdrbg.DRBG_SHA2_256(entropy=params['hdrbg_seed']+bytes(24),nonce=bytes(32))
-    drbg_msg = copy.deepcopy(drbg)
-    #take zeta out
-    zeta = bytearray()
-    zeta += drbg.get_bytes(32)
-
-    #generate initial message
-    message = bytearray(msg_size)
-
-    indexes = params['indexes']
-    message_size = params['msg_size']
-    messages = []
-    for idx in indexes:
-        drbg_msg_tmp = copy.deepcopy(drbg_msg)
-        hbound = min(8,message_size)
-        message[0:hbound] = drbg_msg_tmp.get_bytes(hbound,additional_input=idx.to_bytes(8,byteorder='little')) 
-        messages.append(bytes(message))
-
-    # Compute M' for Sign_Internal
-    mprimes = []
-    for i in range(0,len(messages)):
-        m = bytearray()
-        m += bytes(2) #assume ctx_size=0
-        m += messages[i]
-        mprimes.append(bytes(m))
-
-    # Compute Mu
-    mus = []
-    tr = params['sk'][64:128]
-    for i in range(0,len(messages)):
-        m = bytearray(tr)
-        m += mprimes[i]
-        mus.append(hashlib.shake_256(m).digest(64))
-
-    return messages, mprimes, mus
+from mldsa_utils import gen_mldsa_inputs, gen_mldsa_outputs, size_str
 
 def format_as_c(params, *,expand_msg=False):
     out = io.StringIO()
@@ -65,7 +17,7 @@ def format_as_c(params, *,expand_msg=False):
         print(s,end=end,file=out)
 
     # Generate the inputs
-    messages, mprimes, mus = gen_mldsa_inputs(params)
+    messages, mprimes, mus, _pk, _sk = gen_mldsa_inputs(params)
 
     # Output them as C variables
     def print_c_byte_array(name,dat,end='\n'):
@@ -171,7 +123,7 @@ def format_as_sv(params, *,expand_msg=False):
     def p(s,end='\n'):
         print(s,end=end,file=out)
     # Generate the inputs
-    messages, mprimes, mus = gen_mldsa_inputs(params)
+    messages, mprimes, mus, _pk, _sk = gen_mldsa_inputs(params)
 
     def int_as_sv_u64(name, v):
         if not isinstance(v,int):
@@ -250,6 +202,44 @@ def format_as_sv(params, *,expand_msg=False):
     print_param_as_sv_array64('sigs_sha256_digest')
     return out.getvalue()
 
+def format_as_acvp_json(params, version=None):
+    out = io.StringIO()
+    def p(s,end='\n'):
+        print(s,end=end,file=out)
+    # Generate the inputs
+    messages, _mprimes, _mus, pk, _sk = gen_mldsa_inputs(params)
+    signatures = gen_mldsa_outputs(params)
+    testGroup = {}
+    testGroup["type"] = "MlDsaSign"
+    testGroup["privateSeed"] = Utils.hexstr(params['mldsa_seed'],separator='')
+    #testGroup["privateKeyPkcs8"] = ?
+    #testGroup["publicKey"] = Utils.hexstr(pk,separator='')
+    source = {"name": "https://github.com/sebastien-riou/BTVG-MLDSA" }
+    if version:
+        source["version"] = version
+    testGroup["source"] = source
+    tests = []
+    for i in range(0,len(messages)):
+        test = {}
+        test["tcId"] = i+1
+        test["msg"] = Utils.hexstr(messages[i],separator='')
+        test["sig"] = Utils.hexstr(signatures[i],separator='')
+        test["result"] = "valid"
+        test["flags"] = ["ValidSignature"]
+        tests.append(test)
+    testGroup["tests"] = tests
+    testGroups = []
+    testGroups.append(testGroup)
+    top = {}
+    top["algorithm"] = f"ML-DSA-{params['mldsa_pset']}"
+    top["numberOfTests"] = len(messages)
+    top["schema"] = "mldsa_sign_seed_schema.json"
+    top["testGroups"] = testGroups
+
+    json.dump(top,out,indent=2)
+
+    return out.getvalue()
+
 def gen_tv_name(params):
     base_name = f"mldsa{params['mldsa_pset']}-m{size_str(params['msg_size'])}-h{Utils.hexstr(params['sigs_sha256_digest'][:4],separator='')}"
     return base_name
@@ -261,8 +251,8 @@ if __name__ == '__main__':
     levels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
     parser.add_argument('--log-level', default='INFO', choices=levels)
     parser.add_argument('params', default=None, help='Path to input parameter file (.py)', type=str)
-    formats = ('C', 'SV', 'ALL')
-    parser.add_argument('format', default='C', choices=formats, help='output format')
+    formats = ('ACVP', 'C', 'SV', 'ALL')
+    parser.add_argument('--format', default='ACVP', choices=formats, help='output format')
     parser.add_argument('--expand-msg', help='Fully expand message input', action='store_true')
     parser.add_argument('--write', default='', help='Path to write result files', type=str)
 
@@ -271,14 +261,18 @@ if __name__ == '__main__':
     logdatefmt = '%Y-%m-%d %H:%M:%S'
     logging.basicConfig(level=args.log_level, format=logformat, datefmt=logdatefmt)
 
+    gen_acvp=False
     gen_c=False
     gen_sv=False
     match args.format:
+        case 'ACVP':
+            gen_acvp = True
         case 'C':
             gen_c = True
         case 'SV':
             gen_sv = True
         case 'ALL':
+            gen_acvp = True
             gen_c = True
             gen_sv = True
 
@@ -286,6 +280,8 @@ if __name__ == '__main__':
     params = runpy.run_path(args.params)
     
     out=[]
+    if gen_acvp:
+        out.append(['json',format_as_acvp_json(params)])
     if gen_c:
         out.append(['c',format_as_c(params,expand_msg=args.expand_msg)])
     if gen_sv:

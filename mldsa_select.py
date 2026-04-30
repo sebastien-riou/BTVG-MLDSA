@@ -8,20 +8,9 @@ import io
 from pysatl import Utils
 import math
 
-import gen_mldsa_inputs
-from dilithium_py.src.dilithium_py.ml_dsa import default_parameters
+import mldsa_utils
 
 
-def get_mldsa_impl(paramset:int):
-    match(paramset):
-        case 44:
-            return default_parameters.ML_DSA_44
-        case 65:
-            return default_parameters.ML_DSA_65
-        case 87:
-            return default_parameters.ML_DSA_87
-        case _:
-            raise NotImplementedError(f'Unsupported parameter set {paramset}')
 
 #find a set of data inputs which include:
 #- min repetition number (1)
@@ -43,7 +32,7 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
     logging.debug(f'entropy: {Utils.hexstr(entropy)}')
     drbg = hdrbg.DRBG_SHA2_256(entropy=entropy,nonce=bytes(32))
     drbg_msg = copy.deepcopy(drbg)
-    dut = get_mldsa_impl(paramset=data['mldsa pset'])
+    dut = mldsa_utils.get_mldsa_impl(paramset=data['mldsa pset'])
     zeta = bytearray()
     zeta += drbg.get_bytes(32)
     logging.debug(f'zeta = {Utils.hexstr(zeta)}')
@@ -265,7 +254,7 @@ def select_testvectors(data,*,only1 = False, dst_dir=None):
             raise RuntimeError(f'Best case not in the selection')
 
     digest = hashlib.sha256(sigs).digest()
-    base_name = f"mldsa{data['mldsa pset']}-m{gen_mldsa_inputs.size_str(data['msg size'])}-h{Utils.hexstr(digest[:4],separator='')}"
+    base_name = f"mldsa{data['mldsa pset']}-m{mldsa_utils.size_str(data['msg size'])}-h{Utils.hexstr(digest[:4],separator='')}"
     if dst_dir:
         base_name = os.path.join(dst_dir,base_name)
     out_file = base_name+'.sel.py'

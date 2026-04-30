@@ -31,12 +31,16 @@ If you set higher number of processes and/or higher number of trials, you may wa
 size of log files.
 
 ## How to use the test vectors
+The test vectors are delivered in 4 formats.
+
+### Json
+Json files in the same format as ACVP test server. Use this format if you already have a setup which process that kind of test vectors.
 
 ### Python
-See `example.py`
+See `example.py`.
 
 ### C
-See [MLDSA-benchmark](https://github.com/sebastien-riou/MLDSA-benchmark/blob/main/libmldsa-lbmk/source/core.c)
+See [MLDSA-benchmark](https://github.com/sebastien-riou/MLDSA-benchmark/blob/main/libmldsa-lbmk/source/core.c).
 
 ### System verilog
 
