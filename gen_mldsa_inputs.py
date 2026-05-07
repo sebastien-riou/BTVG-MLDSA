@@ -213,6 +213,9 @@ def format_as_acvp_json(params, version=None):
     testGroup["type"] = "MlDsaSign"
     testGroup["parameterSet"] = f"ML-DSA-{params['mldsa_pset']}"
     testGroup["privateSeed"] = Utils.hexstr(params['mldsa_seed'],separator='')
+    testGroup["sigsSha256Digest"] = Utils.hexstr(params['sigs_sha256_digest'],separator='')
+    testGroup["average_repetitions"] = params['average']
+    testGroup["max_repetitions"] = params['max_repetitions']
     #testGroup["privateKeyPkcs8"] = ?
     #testGroup["publicKey"] = Utils.hexstr(pk,separator='')
     testGroup["deterministic"] = "true"
@@ -228,6 +231,8 @@ def format_as_acvp_json(params, version=None):
         test["sig"] = Utils.hexstr(signatures[i],separator='')
         test["result"] = "valid"
         test["flags"] = ["ValidSignature"]
+        test["repetitions"] = params['repetitions'][i]
+        test["sibBytes"] = params['sib_bytes'][i]
         tests.append(test)
     testGroup["tests"] = tests
     testGroups = []
